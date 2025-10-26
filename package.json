@@ -1,0 +1,17 @@
+{
+  "name": "topographic",
+  "version": "1.0.0",
+  "description": "Programmatically generate topographic maps",
+  "main": "topographic.js",
+  "scripts": {
+    "start": "python3 -m http.server 8000"
+  },
+  "keywords": [
+    "topographic",
+    "contour",
+    "maps",
+    "visualization"
+  ],
+  "author": "",
+  "license": "MIT"
+}

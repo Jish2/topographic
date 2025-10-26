@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Topographic Generator</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+      }
+      .controls {
+        margin: 20px 0;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 14px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.3s;
+      }
+      button:hover {
+        opacity: 0.8;
+      }
+      .btn-primary {
+        background: #4caf50;
+        color: white;
+      }
+      .btn-secondary {
+        background: #2196f3;
+        color: white;
+      }
+      .btn-danger {
+        background: #f44336;
+        color: white;
+      }
+      input[type="range"] {
+        width: 200px;
+      }
+      label {
+        margin-right: 5px;
+        font-weight: bold;
+      }
+      #canvas {
+        border: 1px solid #ddd;
+        background: #222222;
+        cursor: crosshair;
+      }
+      .info {
+        margin-top: 10px;
+        padding: 10px;
+        background: #e3f2fd;
+        border-radius: 4px;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Topographic Generator</h1>
+
+      <div class="controls">
+        <button class="btn-primary" onclick="generateTopo()">
+          Generate New
+        </button>
+        <button class="btn-secondary" onclick="exportPNG()">Export PNG</button>
+        <button class="btn-secondary" onclick="exportSVG()">Export SVG</button>
+        <button class="btn-secondary" onclick="toggleAnimation()">
+          Toggle Animation
+        </button>
+        <button class="btn-danger" onclick="stopAnimation()">
+          Stop Animation
+        </button>
+
+        <label for="resolution">Resolution:</label>
+        <input
+          type="range"
+          id="resolution"
+          min="200"
+          max="800"
+          value="600"
+          step="100"
+          onchange="updateResolution()"
+        />
+        <span id="resolutionValue">600</span>
+
+        <label for="contours">Contours:</label>
+        <input
+          type="range"
+          id="contours"
+          min="5"
+          max="30"
+          value="12"
+          step="1"
+          onchange="generateTopo()"
+        />
+        <span id="contoursValue">12</span>
+      </div>
+
+      <canvas id="canvas"></canvas>
+
+      <div class="info">
+        <strong>Controls:</strong> Generate creates a unique topographical
+        pattern using Perlin noise. Export PNG/SVG for static images. Toggle
+        animation to see the elevation shift over time.
+      </div>
+    </div>
+
+    <script src="perlin-noise.js"></script>
+    <script src="terrain.js"></script>
+    <script src="renderer.js"></script>
+    <script src="export.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
