@@ -26,49 +26,62 @@ async function exportSVG() {
   const cellWidth = width / gridW;
   const cellHeight = height / gridH;
 
-  // helpers
+  const EPS = 0.75;
+  const Q = 100;
+  const quantize = (p) => ({
+    x: Math.round(p.x * Q) / Q,
+    y: Math.round(p.y * Q) / Q,
+  });
+  const key = (p) => `${Math.round(p.x * Q)}:${Math.round(p.y * Q)}`;
+
   function interp(x1, y1, v1, x2, y2, v2, level) {
     const t = (level - v1) / (v2 - v1);
     return { x: x1 + (x2 - x1) * t, y: y1 + (y2 - y1) * t };
   }
 
-  function chaikin(points, iterations = 2) {
-    let pts = points;
+  function chaikin(points, iterations = 2, closed = false) {
+    let pts = points.slice();
     for (let k = 0; k < iterations; k++) {
       if (pts.length < 2) break;
       const result = [];
-      for (let i = 0; i < pts.length - 1; i++) {
+      const N = pts.length;
+      const limit = closed ? N : N - 1;
+      for (let i = 0; i < limit; i++) {
         const p0 = pts[i];
-        const p1 = pts[i + 1];
-        const Q = {
+        const p1 = pts[(i + 1) % N];
+        const Qp = {
           x: 0.75 * p0.x + 0.25 * p1.x,
           y: 0.75 * p0.y + 0.25 * p1.y,
         };
-        const R = {
+        const Rp = {
           x: 0.25 * p0.x + 0.75 * p1.x,
           y: 0.25 * p0.y + 0.75 * p1.y,
         };
-        result.push(Q, R);
+        result.push(Qp, Rp);
+      }
+      if (!closed && result.length > 0) {
+        result.unshift(pts[0]);
+        result.push(pts[pts.length - 1]);
       }
       pts = result;
     }
     return pts;
   }
 
-  // build SVG path data from polylines
   let svgPaths = "";
 
   for (let li = 0; li <= numContours; li++) {
     const level = li / numContours;
     const segs = [];
 
-    // collect segments via marching squares
+    // collect segments with asymptotic decider
     for (let y = 0; y < gridH - 1; y++) {
       for (let x = 0; x < gridW - 1; x++) {
         const v00 = heightMap[y][x];
         const v10 = heightMap[y][x + 1];
         const v01 = heightMap[y + 1][x];
         const v11 = heightMap[y + 1][x + 1];
+        const center = (v00 + v10 + v01 + v11) / 4;
 
         const x0 = x * cellWidth;
         const y0 = y * cellHeight;
@@ -82,84 +95,121 @@ async function exportSVG() {
         const code = (i0 << 3) | (i1 << 2) | (i2 << 1) | i3;
         if (code === 0 || code === 15) continue;
 
-        const edges = [];
-        // top
-        if ((code & 0b1100) === 0b1000 || (code & 0b1100) === 0b0100) {
-          edges.push(interp(x0, y0, v00, x1, y0, v10, level));
-        }
-        // right
-        if ((code & 0b0110) === 0b0010 || (code & 0b0110) === 0b0100) {
-          edges.push(interp(x1, y0, v10, x1, y1, v11, level));
-        }
-        // bottom
-        if ((code & 0b0011) === 0b0001 || (code & 0b0011) === 0b0010) {
-          edges.push(interp(x0, y1, v01, x1, y1, v11, level));
-        }
-        // left
-        if ((code & 0b1001) === 0b0001 || (code & 0b1001) === 0b1000) {
-          edges.push(interp(x0, y0, v00, x0, y1, v01, level));
-        }
+        const eTop = interp(x0, y0, v00, x1, y0, v10, level);
+        const eRight = interp(x1, y0, v10, x1, y1, v11, level);
+        const eBottom = interp(x0, y1, v01, x1, y1, v11, level);
+        const eLeft = interp(x0, y0, v00, x0, y1, v01, level);
 
-        if (edges.length === 2) {
-          segs.push({ a: edges[0], b: edges[1] });
-        } else if (edges.length === 4) {
-          segs.push({ a: edges[0], b: edges[1] });
-          segs.push({ a: edges[2], b: edges[3] });
+        switch (code) {
+          case 1:
+          case 14:
+            segs.push({ a: quantize(eLeft), b: quantize(eBottom) });
+            break;
+          case 2:
+          case 13:
+            segs.push({ a: quantize(eBottom), b: quantize(eRight) });
+            break;
+          case 3:
+          case 12:
+            segs.push({ a: quantize(eLeft), b: quantize(eRight) });
+            break;
+          case 4:
+          case 11:
+            segs.push({ a: quantize(eTop), b: quantize(eRight) });
+            break;
+          case 5:
+          case 10: {
+            const connectAcross = center > level;
+            if (connectAcross) {
+              segs.push({ a: quantize(eTop), b: quantize(eRight) });
+              segs.push({ a: quantize(eLeft), b: quantize(eBottom) });
+            } else {
+              segs.push({ a: quantize(eTop), b: quantize(eLeft) });
+              segs.push({ a: quantize(eRight), b: quantize(eBottom) });
+            }
+            break;
+          }
+          case 6:
+          case 9:
+            segs.push({ a: quantize(eTop), b: quantize(eBottom) });
+            break;
+          case 7:
+          case 8:
+            segs.push({ a: quantize(eTop), b: quantize(eLeft) });
+            break;
         }
       }
     }
 
-    // chain to polylines
+    // adjacency chaining
+    const adjacency = new Map();
+    for (const s of segs) {
+      const ka = key(s.a);
+      const kb = key(s.b);
+      if (!adjacency.has(ka)) adjacency.set(ka, []);
+      if (!adjacency.has(kb)) adjacency.set(kb, []);
+      adjacency.get(ka).push(s.b);
+      adjacency.get(kb).push(s.a);
+    }
+
+    const visitedEdge = new Set();
     const polylines = [];
-    const used = new Array(segs.length).fill(false);
+    const edgeId = (a, b) => `${key(a)}|${key(b)}`;
 
-    function findNext(pt) {
-      for (let i = 0; i < segs.length; i++) {
-        if (used[i]) continue;
-        const s = segs[i];
-        if (Math.hypot(s.a.x - pt.x, s.a.y - pt.y) < 0.5) {
-          used[i] = true;
-          return s.b;
+    for (const [kStart, neighbors] of adjacency.entries()) {
+      for (const nb of neighbors) {
+        const a = {
+          x: parseInt(kStart.split(":")[0]) / Q,
+          y: parseInt(kStart.split(":")[1]) / Q,
+        };
+        const b = nb;
+        const eid = edgeId(a, b);
+        if (visitedEdge.has(eid)) continue;
+        visitedEdge.add(eid);
+
+        const poly = [a, b];
+        // forward
+        let curr = b;
+        let prevKey = key(a);
+        while (true) {
+          const neigh = adjacency.get(key(curr)) || [];
+          let next = null;
+          for (const t of neigh) {
+            const e2 = edgeId(curr, t);
+            if (key(t) === prevKey) continue;
+            if (visitedEdge.has(e2)) continue;
+            next = t;
+            visitedEdge.add(e2);
+            break;
+          }
+          if (!next) break;
+          poly.push(next);
+          prevKey = key(curr);
+          curr = next;
+          if (Math.hypot(curr.x - a.x, curr.y - a.y) < EPS) {
+            poly[poly.length - 1] = a; // close
+            break;
+          }
         }
-        if (Math.hypot(s.b.x - pt.x, s.b.y - pt.y) < 0.5) {
-          used[i] = true;
-          return s.a;
-        }
+
+        polylines.push(poly);
       }
-      return null;
     }
 
-    for (let i = 0; i < segs.length; i++) {
-      if (used[i]) continue;
-      used[i] = true;
-      const poly = [segs[i].a, segs[i].b];
-
-      while (true) {
-        const tail = poly[poly.length - 1];
-        const n = findNext(tail);
-        if (!n) break;
-        poly.push(n);
-      }
-      while (true) {
-        const head = poly[0];
-        const n = findNext(head);
-        if (!n) break;
-        poly.unshift(n);
-      }
-
-      if (poly.length > 1) polylines.push(poly);
-    }
-
-    // optional smoothing
-    const smoothedPolys = polylines.map((p) => chaikin(p, 2));
-
-    // build path data
-    for (const pts of smoothedPolys) {
+    // smooth and emit paths
+    for (const line of polylines) {
+      const isClosed =
+        Math.hypot(
+          line[0].x - line[line.length - 1].x,
+          line[0].y - line[line.length - 1].y
+        ) < EPS;
+      const pts = chaikin(line, 2, isClosed);
       if (!pts || pts.length < 2) continue;
       let d = `M ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}`;
       for (let i = 1; i < pts.length; i++) {
         d += ` L ${pts[i].x.toFixed(2)} ${pts[i].y.toFixed(2)}`;
       }
+      if (isClosed) d += " Z";
       svgPaths += `<path fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.75" d="${d}"/>`;
     }
   }
