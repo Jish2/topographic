@@ -11,6 +11,8 @@ let scaleVariance = 0.0042; // how much the scale can vary around base
 let lastFrameTs = null; // ms timestamp from rAF
 let warpAmplitude = 0.06; // domain warp strength in noise units
 let warpFrequency = 0.75; // domain warp frequency multiplier
+let recording = false;
+let recordStopTimeout = null;
 
 // Initialize canvas size
 function updateResolution() {
@@ -105,6 +107,124 @@ function stopAnimation() {
     cancelAnimationFrame(animationId);
     animationId = null;
   }
+}
+
+// Export animation as WebM using MediaRecorder
+async function exportWebM() {
+  if (!canvas) return;
+  const durationSec = Math.max(
+    1,
+    parseInt(document.getElementById("recDuration").value || 10)
+  );
+  const fps = Math.max(
+    1,
+    Math.min(60, parseInt(document.getElementById("recFps").value || 30))
+  );
+  const stream = canvas.captureStream(fps);
+  const chunks = [];
+  const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+    ? "video/webm;codecs=vp9"
+    : "video/webm";
+  const mbps = Math.max(
+    1,
+    parseInt(document.getElementById("webmBitrate").value || 12)
+  );
+  const bps = mbps * 1_000_000;
+  const rec = new MediaRecorder(stream, {
+    mimeType: mime,
+    videoBitsPerSecond: bps,
+  });
+  rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  rec.onstop = () => {
+    const blob = new Blob(chunks, { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `topographic_${Date.now()}.webm`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ensure animation is running during record
+  if (!animationId) toggleAnimation();
+  recording = true;
+  rec.start();
+  recordStopTimeout && clearTimeout(recordStopTimeout);
+  recordStopTimeout = setTimeout(() => {
+    rec.stop();
+    recording = false;
+  }, durationSec * 1000);
+}
+
+// Export animation as GIF using gif.js (best-effort, slower)
+async function exportGIF() {
+  if (!canvas) return;
+  const statusEl = document.getElementById("recordStatus");
+  const gifBtn = document.getElementById("recordGifBtn");
+  const webmBtn = document.getElementById("recordWebmBtn");
+  if (typeof GIF === "undefined") {
+    alert("GIF library not loaded. Check network connectivity.");
+    return;
+  }
+  const durationSec = Math.max(
+    1,
+    parseInt(document.getElementById("recDuration").value || 10)
+  );
+  const fps = Math.max(
+    1,
+    Math.min(30, parseInt(document.getElementById("recFps").value || 15))
+  );
+  const totalFrames = Math.floor(durationSec * fps);
+
+  // start animation if needed
+  if (!animationId) toggleAnimation();
+
+  // read quality/dither if present
+  const q = Math.max(
+    1,
+    Math.min(30, parseInt(document.getElementById("gifQuality")?.value || 8))
+  );
+  const dither = !!document.getElementById("gifDither")?.checked;
+
+  const gif = new GIF({
+    workers: 2,
+    quality: q,
+    dither: dither ? "FloydSteinberg" : false,
+    workerScript: "gif.worker.proxy.js",
+  });
+
+  if (gifBtn) gifBtn.disabled = true;
+  if (webmBtn) webmBtn.disabled = true;
+  if (statusEl) statusEl.textContent = `Capturing 0/${totalFrames}`;
+
+  gif.on("progress", function (p) {
+    if (statusEl)
+      statusEl.textContent = `GIF encoding ${(p * 100).toFixed(0)}%`;
+  });
+
+  let captured = 0;
+  const capture = () => {
+    gif.addFrame(canvas, { copy: true, delay: 1000 / fps });
+    captured++;
+    if (statusEl) statusEl.textContent = `Capturing ${captured}/${totalFrames}`;
+    if (captured < totalFrames) {
+      requestAnimationFrame(capture);
+    } else {
+      gif.on("finished", function (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `topographic_${Date.now()}.gif`;
+        a.click();
+        URL.revokeObjectURL(url);
+        if (statusEl) statusEl.textContent = "";
+        if (gifBtn) gifBtn.disabled = false;
+        if (webmBtn) webmBtn.disabled = false;
+      });
+      gif.render();
+    }
+  };
+  requestAnimationFrame(capture);
 }
 
 // Wait for DOM to be ready
