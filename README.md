@@ -27,24 +27,35 @@ then, open http://localhost:8000
 ## features
 
 - generates unique topographical patterns using perlin noise
-- adjustable contour lines (5-30)
-- resolution from 200px to 800px
-- export to png or svg
-- toggle animation to see elevation changes
-- automatic color bands based on elevation
+- adjustable contour lines (5-30), default 24
+- custom width/height (100-8192)
+- export to png, svg, webm, gif
+- fluid animation with domain warping and animated bias (birth/death of blobs)
+- realtime number inputs to tune everything
 
 ## controls
 
-- generate new: creates a random topographical pattern
-- export png: download as png image
-- export svg: download as svg vector
-- toggle animation: animate the landscape to show elevation changes
-- resolution slider: adjust export size (200-800px)
-- contours slider: control number of contour lines (5-30)
+- generate new: create a new random pattern
+- export png: download as png
+- export svg: download as svg
+- toggle animation: start/stop animation
+- stop animation: stop and reset the toggle text
+- width / height: canvas size in px
+- contours: number of contour lines (5-30)
+- anim speed: time progression
+- drift amp: spatial drift amount
+- base scale: feature size (lower = bigger shapes)
+- scale var: scale breathing amount
+- warp amp: domain warp strength
+- warp freq: domain warp frequency
+- rotate speed: radians/sec for domain rotation (default 0)
+- bias speed: how fast global bias oscillates (creates blob birth/death)
+- record webm: duration (s), fps, webm bitrate (mbps)
+- record gif (beta): duration (s), fps (≤30), gif quality (1-30), dither
 
 ## technical details
 
-uses perlin noise with octaves for terrain generation, marching squares for contour lines, canvas for rendering, and can export to svg for scalable output.
+uses perlin noise with octaves for terrain generation, time-varying domain warping, optional rotating domain, and an animated global bias. contour lines are extracted via marching squares with an asymptotic decider and smoothed with chaikin. rendering is on canvas. svg export reconstructs polylines. webm is recorded with mediarecorder + canvas.capturestream. gif uses gif.js with a same-origin worker proxy.
 
 ## file structure
 
@@ -54,3 +65,4 @@ uses perlin noise with octaves for terrain generation, marching squares for cont
 - `renderer.js` - canvas rendering
 - `export.js` - png/svg export
 - `app.js` - main app state and ui controls
+- `gif.worker.proxy.js` - same-origin proxy for gif.js worker
