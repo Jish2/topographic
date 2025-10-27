@@ -10,6 +10,10 @@ create something like this:
 
 but, be able to generate unique versions and animate it.
 
+## preview
+
+<video src="preview.webm" controls autoplay loop muted style="max-width: 100%; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 10px; background: #222;"></video>
+
 ## usage
 
 start a local server:
