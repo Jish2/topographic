@@ -11,7 +11,9 @@ function generateHeightMap(
   scaleOverride = null,
   time = 0,
   warpAmp = 0,
-  warpFreq = 1
+  warpFreq = 1,
+  rotateAngle = 0,
+  globalBias = 0
 ) {
   const map = [];
   // slightly lower frequency for broader, smoother features
@@ -20,8 +22,18 @@ function generateHeightMap(
   for (let y = 0; y < height; y++) {
     map[y] = [];
     for (let x = 0; x < width; x++) {
-      const nx = (x + offsetX) * scale;
-      const ny = (y + offsetY) * scale;
+      let nx = (x + offsetX) * scale;
+      let ny = (y + offsetY) * scale;
+
+      // slow rotation of the noise domain to change feature connectivity
+      if (rotateAngle) {
+        const c = Math.cos(rotateAngle);
+        const s = Math.sin(rotateAngle);
+        const rx = nx * c - ny * s;
+        const ry = nx * s + ny * c;
+        nx = rx;
+        ny = ry;
+      }
 
       // time-varying domain warp to morph features smoothly
       let wx = nx;
@@ -46,6 +58,8 @@ function generateHeightMap(
       // normalize to 0-1 range
       value = (value + 1) / 2;
 
+      // global bias shifts iso-level crossings to create appearing/disappearing blobs
+      value = Math.max(0, Math.min(1, value + globalBias));
       map[y][x] = value;
     }
   }

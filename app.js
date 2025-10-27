@@ -11,6 +11,8 @@ let scaleVariance = 0.0042; // how much the scale can vary around base
 let lastFrameTs = null; // ms timestamp from rAF
 let warpAmplitude = 0.06; // domain warp strength in noise units
 let warpFrequency = 0.75; // domain warp frequency multiplier
+let rotateSpeed = 0.0; // radians per second for domain rotation
+let biasSpeed = 0.35; // speed multiplier for animated global bias
 let recording = false;
 let recordStopTimeout = null;
 
@@ -70,6 +72,9 @@ function animate(ts) {
   const scaleMod =
     baseScale + scaleVariance * 0.5 * (1 + Math.sin(animationTime * 0.25));
 
+  // animate global bias slowly to create births/deaths of blobs
+  const animatedBias = 0.06 * Math.sin(animationTime * biasSpeed);
+
   heightMap = generateHeightMap(
     gridW,
     gridH,
@@ -78,7 +83,9 @@ function animate(ts) {
     scaleMod,
     animationTime,
     warpAmplitude,
-    warpFrequency
+    warpFrequency,
+    animationTime * rotateSpeed,
+    animatedBias
   );
   renderTopographic(width, height, heightMap);
 
@@ -309,6 +316,16 @@ document.addEventListener("DOMContentLoaded", function () {
   bindSlider(
     "warpFrequency",
     (v) => (warpFrequency = v),
+    (v) => Number(v).toFixed(2)
+  );
+  bindSlider(
+    "rotateSpeed",
+    (v) => (rotateSpeed = v),
+    (v) => Number(v).toFixed(2)
+  );
+  bindSlider(
+    "biasSpeed",
+    (v) => (biasSpeed = v),
     (v) => Number(v).toFixed(2)
   );
 });
