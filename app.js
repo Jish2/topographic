@@ -8,11 +8,23 @@ let animationTime = 0;
 // Initialize canvas size
 function updateResolution() {
   if (!canvas || !ctx) return;
-  const size = parseInt(document.getElementById("resolution").value);
-  document.getElementById("resolutionValue").textContent = size;
-  canvas.width = size;
-  canvas.height = size;
+  const widthInput = document.getElementById("widthInput");
+  const heightInput = document.getElementById("heightInput");
+  const w = Math.max(100, Math.min(8192, parseInt(widthInput.value || 600)));
+  const h = Math.max(100, Math.min(8192, parseInt(heightInput.value || 600)));
+  widthInput.value = w;
+  heightInput.value = h;
+  canvas.width = w;
+  canvas.height = h;
   generateTopo();
+}
+
+function computeGridSamples(canvasW, canvasH) {
+  // aim for ~4px per cell; clamp to reasonable bounds
+  const targetCellSizePx = 4; // smaller = higher detail
+  const gridW = Math.max(50, Math.round(canvasW / targetCellSizePx));
+  const gridH = Math.max(50, Math.round(canvasH / targetCellSizePx));
+  return { gridW, gridH };
 }
 
 // Generate new topographic map
@@ -24,7 +36,8 @@ function generateTopo() {
   const width = canvas.width;
   const height = canvas.height;
 
-  heightMap = generateHeightMap(150, 150);
+  const { gridW, gridH } = computeGridSamples(width, height);
+  heightMap = generateHeightMap(gridW, gridH);
   renderTopographic(width, height, heightMap);
 }
 
@@ -35,11 +48,13 @@ function animate() {
   const width = canvas.width;
   const height = canvas.height;
 
+  const { gridW, gridH } = computeGridSamples(width, height);
+
   // Generate height map with time offset for animation
   const offsetX = Math.sin(animationTime) * 10;
   const offsetY = Math.cos(animationTime) * 10;
 
-  heightMap = generateHeightMap(150, 150, offsetX, offsetY);
+  heightMap = generateHeightMap(gridW, gridH, offsetX, offsetY);
   renderTopographic(width, height, heightMap);
 
   if (animationId) {
@@ -70,7 +85,14 @@ function stopAnimation() {
 document.addEventListener("DOMContentLoaded", function () {
   canvas = document.getElementById("canvas");
   ctx = canvas.getContext("2d");
-  updateResolution(); // Initial setup
+
+  // set defaults if empty
+  const widthInput = document.getElementById("widthInput");
+  const heightInput = document.getElementById("heightInput");
+  if (!widthInput.value) widthInput.value = 600;
+  if (!heightInput.value) heightInput.value = 600;
+
+  updateResolution();
 
   // Update contour value display
   document.getElementById("contours").addEventListener("input", function () {
