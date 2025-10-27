@@ -24,7 +24,7 @@ function generateTopo() {
   const width = canvas.width;
   const height = canvas.height;
 
-  heightMap = generateHeightMap(100, 100);
+  heightMap = generateHeightMap(150, 150);
   renderTopographic(width, height, heightMap);
 }
 
@@ -39,7 +39,7 @@ function animate() {
   const offsetX = Math.sin(animationTime) * 10;
   const offsetY = Math.cos(animationTime) * 10;
 
-  heightMap = generateHeightMap(100, 100, offsetX, offsetY);
+  heightMap = generateHeightMap(150, 150, offsetX, offsetY);
   renderTopographic(width, height, heightMap);
 
   if (animationId) {

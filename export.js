@@ -26,7 +26,7 @@ async function exportSVG() {
 
   for (let level = 0; level <= numContours; level++) {
     const threshold = level / numContours;
-    let path = `<path fill="none" stroke="#cccccc" stroke-width="1" stroke-opacity="0.6" d="`;
+    let path = `<path fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.8" d="`;
 
     const cellWidth = width / heightMap[0].length;
     const cellHeight = height / heightMap.length;
